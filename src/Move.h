@@ -1,13 +1,13 @@
 
 #pragma once
 
-#include <godot_cpp/classes/object.hpp>
+#include <godot_cpp/classes/node3d.hpp>
 
 
 using namespace godot;
 
-class Move : public Object {
-    GDCLASS(Move, Object);
+class Move : public Node3D {
+    GDCLASS(Move, Node3D);
 
     double x;
     double y;
@@ -17,9 +17,10 @@ protected:
     static void _bind_methods();
 
 public:
-    double getX();
-    double getY();
-    double getZ();
+    int initScanner();
+    void calibrate();
 
+    void _ready() override;
+    void _process(double delta) override;
     Move();
 };

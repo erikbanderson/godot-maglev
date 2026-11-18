@@ -5,10 +5,27 @@ import sys
 from methods import print_error
 
 
-libname = "IoHaptic"
+
+libname = "iohaptic"
 projectdir = "project"
 
-localEnv = Environment(tools=["default"], PLATFORM="")
+
+
+
+localEnv = Environment(tools=["default"], PLATFORM="linux")
+
+## OPTOTRAK BUILD STUFF
+
+opto_path = "/usr/NDIoapi/ndlib/include"
+
+
+localEnv.Append(
+    LIBPATH=["/usr/NDIoapi/ndlib/lib/"],
+    LIBS=["oapi", "m"],
+    LINKFLAGS=["-Wl,-rpath,'/usr/NDIoapi/ndlib/lib'"],
+    CPPDEFINES=["PLATFORM_LINUX"]
+)
+## /OPTOTRAK BUILD
 
 # Build profiles can be used to decrease compile times.
 # You can either specify "disabled_classes", OR
@@ -37,8 +54,8 @@ Run the following command to download godot-cpp:
 
 env = SConscript("godot-cpp/SConstruct", {"api_version": 4.3, "env": env, "customs": customs})
 
-env.Append(CPPPATH=["src/"])
-sources = Glob("src/*.cpp")
+env.Append(CPPPATH=["src/", opto_path])
+sources = Glob("src/*.cpp") + Glob("src/*.c") # Changed to include OPTOTRAK C files
 
 if env["target"] in ["editor", "template_debug"]:
     try:
