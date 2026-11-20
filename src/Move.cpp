@@ -1,7 +1,9 @@
 
 #include "Move.h"
 #include <godot_cpp/core/class_db.hpp>
-
+#include <godot_cpp/classes/input.hpp>
+#include <godot_cpp/classes/input_event_key.hpp>
+#include <godot_cpp/classes/engine.hpp>
 // OPTOTRAK INCLUDES
 
 // Include all the main cpp functionality stuff
@@ -119,6 +121,8 @@ using namespace std;
 void Move::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("initScanner"), & Move:: initScanner);
 	ClassDB::bind_method(D_METHOD("calibrate"), & Move:: calibrate);
+	ClassDB::bind_method(D_METHOD("updateCoords"), & Move:: updateCoords);
+
 }
 
 int Move::initScanner() {
@@ -151,7 +155,6 @@ int Move::initScanner() {
 	cout << "Initializing system...\n";
     if(TransputerInitializeSystem(OPTO_LOG_ERRORS_FLAG|OPTO_LOG_MESSAGES_FLAG)!=OPTO_NO_ERROR_CODE) goto error;
 
-	cout << "System initialized!\n";
 	cout << "Determining system...\n";
 	if(uDetermineSystem()!= OPTOTRAK_CERTUS_FLAG ) goto error;
 
@@ -228,6 +231,7 @@ int Move::initScanner() {
 
 	printf("Initialized!\n");
 
+	fflush(stdout);
 
     return 0;
 
@@ -244,28 +248,34 @@ int Move::initScanner() {
 }
 
 void Move::calibrate(){
+
 	// get latest position
 	this_thread::sleep_for(std::chrono::milliseconds(1000)); // replaced C sleep()
-	// Update positions
-	if(DataGetLatestTransforms( &uFrameNumber, &uElements, &uFlags, &RigidBodyData )) printf("Failed to get transform data.");
+	
+	//Get children for godot to move child objects
+	printf("Getting Godot child objects...\n");
+	fingers = {get_node<Node3D>("Finger1"), get_node<Node3D>("Finger2")};
 
-	for (int n = 0; n < size(fingers); n++) {
+	updateCoords();
 
+	cout << "Calibrating\n";
+	for (int n = 0; n < fingers.size(); n++) {
 		corrections[n] = -coords[n];
 	}
+
 }
 
 void Move::_ready() {
 	UtilityFunctions::print("cpp started");
 	initScanner();
 	calibrate();
+}
 
-	//Get children for godot to move child objects
-	printf("Getting Godot child objects...");
-	Node3D* fingers[] = {get_node<Node3D>("Finger1"), get_node<Node3D>("Finger2")};
-
-	Vector3 coords[] = {Vector3(r1_x, r1_y, r1_z), Vector3(r2_x, r2_y, r2_z)};
-	Basis bases[] = {Basis(
+void Move::updateCoords(){
+	if(DataGetLatestTransforms( &uFrameNumber, &uElements, &uFlags, &RigidBodyData )) printf("Failed to get transform data.");
+	//store in arrays
+	coords = {Vector3(r1_x, r1_y, r1_z), Vector3(r2_x, r2_y, r2_z)};
+	bases = {Basis(
 				Vector3(r1_xx, r1_yx, r1_zx),
 				Vector3(r1_xy, r1_yy, r1_zy),
 				Vector3(r1_xz, r1_yz, r1_zz)
@@ -276,11 +286,16 @@ void Move::_ready() {
 			)};
 }
 
-
 void Move::_process(double delta){
+	int fps = Engine::get_singleton()->get_frames_per_second();
+
+	printf("FPS: %d\n", fps);
+	
 	//update rbody data
-	if(DataGetLatestTransforms( &uFrameNumber, &uElements, &uFlags, &RigidBodyData )) printf("Failed to get transform data.");
-	for (int n = 0; n < size(fingers); n++) {
+	
+	updateCoords();
+	
+	for (int n = 0; n < fingers.size(); n++) {
 		if(!fingers[n]){
 			printf("Error: finger child object not detected!");
 		}
@@ -298,16 +313,15 @@ void Move::_process(double delta){
 
 			// flip y and z axis to transform from optotrak standards to godot
 
-			Basis mirrorYZ(
+			Basis switchYZ(
 				Vector3(1, 0, 0),
-				Vector3(0, -1, 0),
-				Vector3(0, 0, -1)
+				Vector3(0, 0, -1),
+				Vector3(0, 1, 0)
 			);
 			// matmul mirror basis to transform original basis
-			Basis mirrored = mirrorYZ * bases[n] * mirrorYZ;
-			Quaternion rotation = Quaternion(mirrored);
-			// set the rotation (quaternion) of the body
-			fingers[n]->set_quaternion(rotation);
+			Basis mirrored = switchYZ * bases[n].transposed() * switchYZ.inverse();
+
+			fingers[n]->set_basis(mirrored);
 		}
 	}
 
@@ -317,3 +331,14 @@ Move::Move() {
 
 }
 
+void Move::_input(const Ref<InputEvent> &event) {
+    Ref<InputEventKey> key_event = event;
+
+    if (key_event.is_valid() && key_event->is_pressed() && !key_event->is_echo()) {
+        if (key_event->get_keycode() == Key::KEY_SPACE) {
+            // Do something when SPACE is pressed
+			cout << "this works";
+			// initScanner();
+		}
+    }
+}

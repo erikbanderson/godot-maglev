@@ -1,8 +1,19 @@
 [gd_scene format=3 uid="uid://didpfqa11i68r"]
 
-[sub_resource type="BoxMesh" id="BoxMesh_wkvqx"]
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_1qomg"]
 
-[sub_resource type="BoxMesh" id="BoxMesh_0g5n0"]
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_gmma8"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_p8bcg"]
+
+[sub_resource type="Sky" id="Sky_0g5n0"]
+sky_material = SubResource("ProceduralSkyMaterial_p8bcg")
+
+[sub_resource type="Environment" id="Environment_wkvqx"]
+background_mode = 2
+sky = SubResource("Sky_0g5n0")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_wkvqx"]
 
 [node name="Scene" type="Node3D" unique_id=2119974234]
 
@@ -10,14 +21,21 @@
 transform = Transform3D(0.9999999, 0, 0, 0, 0.9999999, 0, 0, 0, 0.99999994, 0, 0, 0)
 
 [node name="Finger1" type="Node3D" parent="Move" unique_id=1797777959]
+transform = Transform3D(0.939804, -0.025803149, -0.3407382, -0.3372713, -0.23030844, -0.9128012, -0.054921746, 0.9727755, -0.22514746, -1.702547e-05, -0.002520752, 0.0012854385)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Move/Finger1" unique_id=2041692061]
-mesh = SubResource("BoxMesh_wkvqx")
+mesh = SubResource("CapsuleMesh_1qomg")
 
 [node name="Finger2" type="Node3D" parent="Move" unique_id=667927514]
+transform = Transform3D(0.5993486, 0.22158176, 0.76920915, 0.79850286, -0.097858824, -0.5939839, -0.056342095, 0.97021914, -0.23558524, -0.14817353, -0.5464026, -0.3744165)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Move/Finger2" unique_id=431852044]
-mesh = SubResource("BoxMesh_0g5n0")
+mesh = SubResource("CapsuleMesh_gmma8")
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=530877047]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2.85767)
+environment = SubResource("Environment_wkvqx")
+
+[node name="Floor" type="MeshInstance3D" parent="." unique_id=1888967644]
+transform = Transform3D(100, 0, 0, 0, 100, 0, 0, 0, 100, 0, -2, 0)
+mesh = SubResource("PlaneMesh_wkvqx")
