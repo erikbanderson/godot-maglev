@@ -1,17 +1,23 @@
 [gd_scene format=3 uid="uid://didpfqa11i68r"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0g5n0"]
+[sub_resource type="BoxMesh" id="BoxMesh_wkvqx"]
 
-[sub_resource type="BoxMesh" id="BoxMesh_7m0ah"]
+[sub_resource type="BoxMesh" id="BoxMesh_0g5n0"]
 
 [node name="Scene" type="Node3D" unique_id=2119974234]
 
 [node name="Move" type="Move" parent="." unique_id=931609670]
-transform = Transform3D(0.97295606, -0.22396757, 0.056523226, -0.15122256, -0.4326303, 0.8887984, -0.17460833, -0.87330943, -0.4547993, -0.0046186256, -0.0415979, 0.0064501953)
+transform = Transform3D(0.9999999, 0, 0, 0, 0.9999999, 0, 0, 0, 0.99999994, 0, 0, 0)
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Move" unique_id=1034621239]
-material_override = SubResource("StandardMaterial3D_0g5n0")
-mesh = SubResource("BoxMesh_7m0ah")
+[node name="Finger1" type="Node3D" parent="Move" unique_id=1797777959]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Move/Finger1" unique_id=2041692061]
+mesh = SubResource("BoxMesh_wkvqx")
+
+[node name="Finger2" type="Node3D" parent="Move" unique_id=667927514]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Move/Finger2" unique_id=431852044]
+mesh = SubResource("BoxMesh_0g5n0")
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=530877047]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2.85767)

@@ -29,7 +29,9 @@ extern "C" {
 	#include "certus_aux.h"
 	#include "ot_aux.h"
 }
-#define PI 3.1415926535898
+
+
+// Optotrak setup stuff
 
 #define SAMPLE_MARKERFREQ	4600.0f
 #define SAMPLE_FRAMEFREQ	650.0f //860.0f // 860 Hz frames
@@ -44,6 +46,15 @@ extern "C" {
 
 #define TICKMAX                 1000 // one second of data at a time
 
+
+
+
+// Optotrak rigidbody datastruct
+typedef struct RigidBodyDataStruct
+{
+    struct OptotrakRigidStruct  pRigidData[NUM_RIGID_BODIES];
+    Position3d                  p3dData[NUM_MARKERS];
+} RigidBodyDataType;
 
 #define r1_x	RigidBodyData.pRigidData[0].transformation.rotation.translation.x
 #define r1_y	RigidBodyData.pRigidData[0].transformation.rotation.translation.y
@@ -71,12 +82,7 @@ extern "C" {
 #define r2_zy	RigidBodyData.pRigidData[1].transformation.rotation.matrix[1][2]
 #define r2_zz	RigidBodyData.pRigidData[1].transformation.rotation.matrix[2][2]
 
-// Optotrak rigidbody datastruct
-typedef struct RigidBodyDataStruct
-{
-    struct OptotrakRigidStruct  pRigidData[NUM_RIGID_BODIES];
-    Position3d                  p3dData[NUM_MARKERS];
-} RigidBodyDataType;
+
 
 // Input OPTOTRAK settings
 
@@ -96,6 +102,8 @@ int i,j;
 FILE *fplog;
 
 char s[] = "system";
+char type[] = "standard";
+char rigidBodyFile[] = "fingercoil";
 char f[] = "optotrak";
 
 char szNDErrorString[MAX_ERROR_STRING_LENGTH + 1];
@@ -106,7 +114,6 @@ int nCurFrame;
 char *pChar;
 char szInput[10];
 
-Vector3 correction;
 using namespace std;
 
 void Move::_bind_methods() {
@@ -161,7 +168,7 @@ int Move::initScanner() {
 	if(OptotrakSetProcessingFlags(OPTO_LIB_POLL_REAL_DATA|OPTO_CONVERT_ON_HOST|OPTO_RIGID_ON_HOST)) goto error;
 	cout << "Processing flags set.\n";
 	cout << "Loading camera params...\n";
-    if(OptotrakLoadCameraParameters("standard")!=OPTO_NO_ERROR_CODE ) goto error;
+    if(OptotrakLoadCameraParameters(type)!=OPTO_NO_ERROR_CODE ) goto error;
         cout << "Camera params loaded.\n";
 	OptotrakEnableWireless(-1,1); // needed or not????
 
@@ -200,7 +207,7 @@ int Move::initScanner() {
   if( RigidBodyAddFromFile(
 	RIGID_BODY_1,
 	1,
-	"fingercoil",
+	rigidBodyFile,
 	0 ) ) goto error; 
   if( RigidBodyChangeSettings(RIGID_BODY_1,NUM_MINIMUM_MARKER_FOR_RIGID_BODY,
   		90,             /* Cut off angle for marker inclusion in calcs.*/
@@ -209,7 +216,7 @@ int Move::initScanner() {
   		(float)2.5,     /* Maximum 3-D RMS marker error for this rigid body. */
   		(float)2.5,     /* Maximum raw sensor RMS error for this rigid body. */
   		OPTOTRAK_QUATERN_RIGID_FLAG | OPTOTRAK_RETURN_MATRIX_FLAG ) ) goto error;
-  if( RigidBodyAddFromFile(RIGID_BODY_2,4,"fingercoil",0 ) ) goto error;
+  if( RigidBodyAddFromFile(RIGID_BODY_2,4,rigidBodyFile,0 ) ) goto error;
   if( RigidBodyChangeSettings(RIGID_BODY_2,NUM_MINIMUM_MARKER_FOR_RIGID_BODY,
   		90,             /* Cut off angle for marker inclusion in calcs.*/
   		(float)2.5,    /* Maximum 3-D marker error for this rigid body. */
@@ -231,61 +238,82 @@ int Move::initScanner() {
 		cout << "\033[1mAn error was detected. Message:\033[0m\n";
         cout << szNDErrorString;
 		cout << "\n";
-		return -1;
 	}
+	return -1;
+
 }
 
 void Move::calibrate(){
 	// get latest position
 	this_thread::sleep_for(std::chrono::milliseconds(1000)); // replaced C sleep()
+	// Update positions
 	if(DataGetLatestTransforms( &uFrameNumber, &uElements, &uFlags, &RigidBodyData )) printf("Failed to get transform data.");
 
-	correction = Vector3(-r1_x,-r1_y,-r1_z);
+	for (int n = 0; n < size(fingers); n++) {
+
+		corrections[n] = -coords[n];
+	}
 }
 
 void Move::_ready() {
 	UtilityFunctions::print("cpp started");
 	initScanner();
 	calibrate();
+
+	//Get children for godot to move child objects
+	printf("Getting Godot child objects...");
+	Node3D* fingers[] = {get_node<Node3D>("Finger1"), get_node<Node3D>("Finger2")};
+
+	Vector3 coords[] = {Vector3(r1_x, r1_y, r1_z), Vector3(r2_x, r2_y, r2_z)};
+	Basis bases[] = {Basis(
+				Vector3(r1_xx, r1_yx, r1_zx),
+				Vector3(r1_xy, r1_yy, r1_zy),
+				Vector3(r1_xz, r1_yz, r1_zz)
+			), Basis(
+				Vector3(r2_xx, r2_yx, r2_zx),
+				Vector3(r2_xy, r2_yy, r2_zy),
+				Vector3(r2_xz, r2_yz, r2_zz)
+			)};
 }
 
 
 void Move::_process(double delta){
 	//update rbody data
 	if(DataGetLatestTransforms( &uFrameNumber, &uElements, &uFlags, &RigidBodyData )) printf("Failed to get transform data.");
-	
-	// transform the new position by translating to the initial coordinate and then converting from mm to m.
-	Vector3 newPosition = 0.01 * Vector3(r1_x+correction.x,r1_y+correction.y,r1_z+correction.z);
-	// transform from optotrak (z up) to godot (y up)
-	double y = newPosition.y;
-	newPosition.y = newPosition.z;
-	newPosition.z = -y;
+	for (int n = 0; n < size(fingers); n++) {
+		if(!fingers[n]){
+			printf("Error: finger child object not detected!");
+		}
+		else{
+			// transform the new position by translating to the initial coordinate and then converting from mm to m.
+			Vector3 newPosition = 0.01 * (coords[n] + corrections[n]);
+			// transform from optotrak (z up) to godot (y up)
+			double y = newPosition.y;
+			newPosition.y = newPosition.z;
+			newPosition.z = -y;
 
-	set_position(newPosition);
+			fingers[n]->set_position(newPosition);
 
-	// now prepare to rotate using the quaternions
-	// flip y and z axis to transform from optotrak to godot
+			// now prepare to rotate using the quaternions
 
-	Basis basis(
-		Vector3(r1_xx, r1_yx, r1_zx),
-		Vector3(r1_xy, r1_yy, r1_zy),
-		Vector3(r1_xz, r1_yz, r1_zz)
-	);
+			// flip y and z axis to transform from optotrak standards to godot
 
-	Basis mirrorY(
-		Vector3(1, 0, 0),
-		Vector3(0, -1, 0),
-		Vector3(0, 0, -1)
-	);
-	Basis mirrored = mirrorY * basis * mirrorY;
-	Quaternion rotation = Quaternion(mirrored);
+			Basis mirrorYZ(
+				Vector3(1, 0, 0),
+				Vector3(0, -1, 0),
+				Vector3(0, 0, -1)
+			);
+			// matmul mirror basis to transform original basis
+			Basis mirrored = mirrorYZ * bases[n] * mirrorYZ;
+			Quaternion rotation = Quaternion(mirrored);
+			// set the rotation (quaternion) of the body
+			fingers[n]->set_quaternion(rotation);
+		}
+	}
 
-
-
-	set_quaternion(rotation);
 }
 
 Move::Move() {
-	printf("yeet");
+
 }
 
